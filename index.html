@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="http://cdnjs.cloudflare.com/ajax/libs/lodash.js/0.5.2/lodash.min.js"></script>
+  <meta charset=utf-8 />
+  <title></title>
+  <script>
+// Этот сниппет взят для экономии времени.
+// Позволяет сохранять файлы из консоли
+(function(console){
+
+  console.save = function(data, filename){
+
+    if(!data) {
+      console.error('Console.save: No data')
+      return;
+    }
+
+    if(!filename) filename = 'console.json'
+
+      if(typeof data === "object"){
+        data = JSON.stringify(data, undefined, 4)
+      }
+
+      var blob = new Blob([data], {type: 'text/json'}),
+      e    = document.createEvent('MouseEvents'),
+      a    = document.createElement('a')
+
+      a.download = filename
+      a.href = window.URL.createObjectURL(blob)
+      a.dataset.downloadurl =  ['text/json', a.download, a.href].join(':')
+      e.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null)
+      a.dispatchEvent(e)
+    }
+  })(console)
+</script>
+</head>
+<body>
+  <div id="content">
+    <p>Открой консоль, там вся магия.</p>
+  </div>
+  <script>
+var url = "/thirdparties"; // URL до папки со скриптами
+var fiasJson, items;
+
+
+function fetchJSONFile(path, callback, async) {
+  if( typeof async === 'undefined') {
+    async = true;
+  }
+  var httpRequest = new XMLHttpRequest();
+  httpRequest.onreadystatechange = function() {
+    if (httpRequest.readyState === 4) {
+      if (httpRequest.status === 200) {
+        var data = JSON.parse(httpRequest.responseText);
+        if (callback) callback(data);
+      }
+    }
+  };
+  httpRequest.open('GET', path, async);
+  httpRequest.send(null);
+}
+
+// Здесь данные берутся из очищенной схемы, так как в оригинале ФИАС отдает 99 регионов,
+// а нам нужны субъекты, их 83
+fetchJSONFile(url +'/russia.json/source/fias.subjects.json?v=1', function(data){
+  fiasJson = data.data;
+  districts2json();
+});
+
+// Просто описываем субюекты в федеральных округах
+// По количеству содержимомого areas проверяется результат разбора fias.subjects.json
+// если оно не совпадает, то ошибка
+var districts = [];
+districts.push({
+  "id": "1",
+  "name": "Центральный федеральный округ",
+  "areas": ["Белгородская", "Брянская", "Владимирская", "Воронежская", "Ивановская", "Калужская", "Костромская", "Курская", "Липецкая", "Московская", "Орловская", "Рязанская", "Смоленская", "Тамбовская", "Тверская", "Тульская", "Ярославская", "Москва"]
+});
+districts.push({
+  "id": "2",
+  "name": "Южный федеральный округ",
+  "areas": ["Адыгея", "Калмыкия", "Краснодарский", "Астраханская", "Волгоградская", "Ростовская"]
+});
+districts.push({
+  "id": "3",
+  "name": "Северо-Западный федеральный округ",
+  "areas": ["Карелия", "Коми", "Архангельская", "Вологодская", "Калининградская", "Ленинградская", "Мурманская", "Новгородская", "Псковская", "Санкт-Петербург", "Ненецкий"]
+});
+districts.push({
+  "id": "4",
+  "name": "Дальневосточный федеральный округ",
+  "areas": ["Саха /Якутия/", "Камчатский", "Приморский", "Хабаровский", "Амурская", "Магаданская", "Сахалинская", "Еврейская", "Чукотский"]
+});
+districts.push({
+  "id": "5",
+  "name": "Сибирский федеральный округ",
+  "areas": ["Алтай", "Бурятия", "Тыва", "Хакасия", "Алтайский", "Забайкальский", "Красноярский", "Иркутская", "Кемеровская", "Новосибирская", "Омская", "Томская"]
+});
+districts.push({
+  "id": "6",
+  "name": "Уральский федеральный округ",
+  "areas": ["Курганская", "Свердловская", "Тюменская", "Челябинская", "Ханты-Мансийский Автономный округ - Югра", "Ямало-Ненецкий"]
+});
+districts.push({
+  "id": "7",
+  "name": "Приволжский федеральный округ",
+  "areas": ["Башкортостан", "Марий Эл", "Мордовия", "Татарстан", "Удмуртская", "Чувашская", "Кировская", "Нижегородская", "Оренбургская", "Пензенская", "Ульяновская", "Самарская", "Саратовская", "Пермский"]
+});
+districts.push({
+  "id": "8",
+  "name": "Северо-Кавказский федеральный округ",
+  "areas": ["Дагестан", "Ингушетия", "Кабардино-Балкарская", "Карачаево-Черкесская", "Северная Осетия - Алания", "Чеченская", "Ставропольский"]
+});
+
+var subjects = [];
+var locality = [];
+
+function save_file(jsonData, filename){
+  console.log(filename +' готов для сохранения');
+  console.save(JSON.stringify(jsonData), filename);
+}
+
+function districts2json(){
+  for (var i in districts) {
+    var areas = _.filter(fiasJson, function(region){
+      return _.any(districts[i].areas, function(area){
+        return region.offname === area;
+      });
+    });
+
+    var result = [];
+    for (var ii in areas) {
+      result.push(
+      {
+        "aoguid": areas[ii].aoguid,
+        "name": areas[ii].offname+ ' '  +areas[ii].shortname,
+        "okato": areas[ii].okato
+      });
+      subjects.push({
+        "aoguid": areas[ii].aoguid,
+        "disid": districts[i].id, // Id Федерального округа
+        "name": areas[ii].offname+ ' '  +areas[ii].shortname,
+        "okato": areas[ii].okato,
+        "parentguid": areas[ii].parentguid,
+        "regioncode": areas[ii].regioncode,
+        });
+      fetchJSONFile(url +'/russia.json/get.php?parentguid='+areas[ii].aoguid, function(data){
+        for(var iii in data.data) {
+          locality.push(
+          {
+            "aoguid": data.data[iii].aoguid,
+            "disid": districts[i].id, // Id Федерального округа
+            "name": data.data[iii].offname+ ' '  +data.data[iii].shortname,
+            "okato": data.data[iii].okato,
+            "parentguid": data.data[iii].parentguid,
+            "regioncode": data.data[iii].regioncode,
+            } );
+        }
+      }, false);
+    }
+    console.log(districts[i].name);
+    var error = false;
+    if(result.length !== districts[i].areas.length) {
+      console.log('%c '+result.length, 'background: #F00; color: #FFF');
+      error = true;
+    } else {
+      districts[i].areas = result;
+      console.log(result.length);
+    }
+  }
+  subjects = _.sortBy(subjects, function(subject){
+    return subject.name;
+  });
+  if(!error) {
+    console.log('----------------------------------------------------');
+    // Можно сохранять всё вместе, браузер будет ругаться на несколько запросов
+    // на загрузку файлов.
+    // save_file({"data": districts}, 'russia.federal-districts.json');
+    // save_file({"data": subjects}, 'russia.subjects.json');
+    // save_file({"data": locality}, 'russia.locality.json');
+    save_file({"data": {
+      "districts": districts,
+      "subjects": subjects,
+      "locality": locality
+    }}, 'russia.json');
+  }
+}
+</script>
+</body>
+</html>
